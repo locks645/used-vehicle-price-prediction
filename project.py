@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 
 #Wine CSV paths in my directory
-vehicles = 'datasets/vehicles.csv'
+vehicles = 'datasets/vehicles-2.csv'
 
 vehicles_data = pd.read_csv(vehicles, delimiter=',')
 
@@ -42,7 +42,7 @@ preprocessor = ColumnTransformer(
 )
 
 # Split the data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
 
 # Define models
 models = {
@@ -79,9 +79,50 @@ error_data = {
     'Neural Network': abs(comparison_df['Actual'] - comparison_df['Neural Network']),
 }
 
+
+error_data2 = {
+    'Linear Regression': comparison_df['Actual'] - comparison_df['Linear Regression'],
+    'Decision Tree': comparison_df['Actual'] - comparison_df['Decision Tree'],
+    'Neural Network': comparison_df['Actual'] - comparison_df['Neural Network'],
+}
+
+total_data_points = cleaned_data.shape[0]
+print(f"Total data points: {total_data_points}")
+
+# Calculate outliers using IQR
+print("\nOutlier Counts:")
+for model, errors in error_data.items():
+    Q1 = np.percentile(errors, 25)
+    Q3 = np.percentile(errors, 75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = errors[(errors < lower_bound) | (errors > upper_bound)]
+    print(f"{model}: {len(outliers)} outliers")
+
+# Calculate outliers using IQR
+print("\nOutlier Counts:")
+for model, errors in error_data2.items():
+    Q1 = np.percentile(errors, 25)
+    Q3 = np.percentile(errors, 75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = errors[(errors < lower_bound) | (errors > upper_bound)]
+    print(f"{model}: {len(outliers)} outliers")
+
 # Print statistics for each model
 print("\nKey Statistics for Absolute Errors:")
 for model, errors in error_data.items():
+    print(f"\n{model}:")
+    print(f"Mean: {np.mean(errors):.2f}")
+    print(f"Q1: {np.percentile(errors, 25):.2f}")
+    print(f"Median (Q2): {np.percentile(errors, 50):.2f}")
+    print(f"Q3: {np.percentile(errors, 75):.2f}")
+
+# Print statistics for each model
+print("\nKey Statistics for Not Absolute Errors:")
+for model, errors in error_data2.items():
     print(f"\n{model}:")
     print(f"Mean: {np.mean(errors):.2f}")
     print(f"Q1: {np.percentile(errors, 25):.2f}")
@@ -100,6 +141,38 @@ plt.boxplot([
 ], labels=['Linear Regression', 'Decision Tree', 'Neural Network'])
 plt.title('Prediction Error Boxplot by Model')
 plt.ylabel('Absolute Error')
+plt.show()
+
+# Create histograms for error distributions
+plt.figure(figsize=(12, 8))
+for model, errors in error_data.items():
+    plt.hist(errors, bins=50, alpha=0.6, label=model)
+plt.title('Histogram of Prediction Errors by Model')
+plt.xlabel('Absolute Error')
+plt.ylabel('Frequency')
+plt.legend()
+plt.show()
+
+# Create a boxplot to visualize the differences in predictions
+plt.figure(figsize=(12, 6))
+plt.boxplot([
+    comparison_df['Actual'] - comparison_df['Linear Regression'],
+    comparison_df['Actual'] - comparison_df['Decision Tree'],
+    comparison_df['Actual'] - comparison_df['Neural Network']
+], labels=['Linear Regression', 'Decision Tree', 'Neural Network'])
+plt.title('Prediction Error Boxplot by Model')
+plt.ylabel('Error')
+plt.show()
+
+
+# Create histograms for error distributions
+plt.figure(figsize=(12, 8))
+for model, errors in error_data2.items():
+    plt.hist(errors, bins=50, alpha=0.6, label=model)
+plt.title('Histogram of Prediction Errors by Model')
+plt.xlabel('Error')
+plt.ylabel('Frequency')
+plt.legend()
 plt.show()
 
 # Plot MSE scores
