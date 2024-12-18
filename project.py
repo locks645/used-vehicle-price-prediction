@@ -1,5 +1,5 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -10,9 +10,6 @@ from sklearn.metrics import mean_squared_error
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.preprocessing import OneHotEncoder
-
-
 
 vehicles = 'datasets/vehicles-2.csv'
 
@@ -44,30 +41,10 @@ def compute_categorical_correlation_matrix(data, categorical_cols):
     encoded_df = pd.DataFrame(encoded_data, columns=encoded_columns)
     return encoded_df.corr()
 
-#categorical_matrix_before = compute_categorical_matrix(vehicles_data, categorical_cols)
-
-
 cleaned_data = vehicles_data[relevant_columns].dropna()
 cleaned_data = cleaned_data[cleaned_data['price'].between(1000, 100000)]
 cleaned_data = cleaned_data[cleaned_data['odometer'].between(0, 500000)]
 cleaned_data = cleaned_data[cleaned_data['year'].between(1980, 2024)]
-
-# After cleaning
-#categorical_matrix_after = compute_categorical_matrix(cleaned_data, categorical_cols)
-
-# Visualization
-#fig, axes = plt.subplots(1, 2, figsize=(16, 6))
-
-# Heatmap for before cleaning
-#sns.heatmap(categorical_matrix_before, ax=axes[0], annot=True, fmt=".1f", cmap="coolwarm", cbar=True)
-#axes[0].set_title("Categorical Relationships Before Cleaning")
-
-# Heatmap for after cleaning
-#sns.heatmap(categorical_matrix_after, ax=axes[1], annot=True, fmt=".1f", cmap="coolwarm", cbar=True)
-#axes[1].set_title("Categorical Relationships After Cleaning")
-
-#plt.tight_layout()
-#plt.show()
 
 numerical_cols_display = ['price', 'year','odometer']
 for col in numerical_cols_display:
@@ -120,15 +97,43 @@ preprocessor = ColumnTransformer(
     ]
 )
 
-
-
-
 # Define models
 models = {
     'Linear Regression': Pipeline(steps=[('preprocessor', preprocessor), ('regressor', LinearRegression())]),
     'Decision Tree': Pipeline(steps=[('preprocessor', preprocessor), ('regressor', DecisionTreeRegressor(random_state=42))]),
     'Neural Network': Pipeline(steps=[('preprocessor', preprocessor), ('regressor', MLPRegressor(random_state=42, max_iter=500))])
 }
+
+dt_param_grid = {
+    'regressor__max_depth': [5, 10, 15, 20, None],
+    'regressor__min_samples_split': [2, 5, 10],
+    'regressor__min_samples_leaf': [1, 2, 4]
+}
+
+# MLP Regressor parameters
+mlp_param_grid = {
+    'regressor__hidden_layer_sizes': [(30,), (50,), (30, 30), (50, 50)],
+    'regressor__alpha': [0.0001, 0.00001],
+    'regressor__learning_rate_init': [0.001, 0.01],
+    'regressor__max_iter': [1000]  # Increased maximum iterations
+}
+
+# GridSearchCV for Decision Tree
+dt_pipeline = Pipeline(steps=[('preprocessor', preprocessor), ('regressor', DecisionTreeRegressor(random_state=42))])
+dt_search = GridSearchCV(dt_pipeline, dt_param_grid, cv=5, scoring='neg_mean_squared_error', verbose=1)
+dt_search.fit(X_train, y_train)
+best_dt_model = dt_search.best_estimator_
+
+# GridSearchCV for MLP Regressor
+mlp_pipeline = Pipeline(steps=[('preprocessor', preprocessor), ('regressor', MLPRegressor(random_state=42, max_iter=1000, early_stopping=True)
+)])
+mlp_search = GridSearchCV(mlp_pipeline, mlp_param_grid, cv=5, scoring='neg_mean_squared_error', verbose=1)
+mlp_search.fit(X_train, y_train)
+best_mlp_model = mlp_search.best_estimator_
+
+# Replace original models with optimized ones
+models['Decision Tree'] = best_dt_model
+models['Neural Network'] = best_mlp_model
 
 # Train models and predict on the test set
 predictions = {}
@@ -260,8 +265,3 @@ plt.bar(mse_scores.keys(), mse_scores.values())
 plt.title('Mean Squared Error Comparison')
 plt.ylabel('MSE')
 plt.show()
-
-# Print explanations for MSE scores
-print("\nMSE Score Explanations:")
-for model, mse in mse_scores.items():
-    print(f"{model}: The Mean Squared Error is {mse:.2f}. This measures the average squared difference between actual and predicted values. Lower values indicate better predictions.")
